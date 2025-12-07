@@ -1,0 +1,18 @@
+Resumo em Português (PT-BR) — análise automática
+
+Hipóteses testadas:
+- Histórico de faltas (absent_lag1, absent_lag2) -> chronic_absence
+- Dia da semana (weekday) -> chronic_absence
+
+Parâmetro absent_lag1: coef=1.5755, SE_cluster=0.0303, z=51.969, p=0, OR=4.833 (95%CI 4.554–5.129)
+Parâmetro absent_lag2: coef=1.7034, SE_cluster=0.0340, z=50.043, p=0, OR=5.492 (95%CI 5.138–5.871)
+
+Efeito por dia da semana (dummies wd_* vs baseline):
+  wd_1: coef=-0.1923, p=2.411e-05, OR=0.825 (95%CI 0.755–0.902)
+  wd_2: coef=-0.0923, p=0.09304, OR=0.912 (95%CI 0.819–1.016)
+  wd_3: coef=0.0551, p=0.3556, OR=1.057 (95%CI 0.940–1.188)
+  wd_4: coef=0.1628, p=0.005416, OR=1.177 (95%CI 1.049–1.320)
+  wd_5: coef=0.3910, p=4.723e-13, OR=1.478 (95%CI 1.330–1.644)
+  wd_6: coef=0.1836, p=4.914e-06, OR=1.201 (95%CI 1.110–1.300)
+
+AUC (classificador para chronic_absence com lags+weekday): 0.7672

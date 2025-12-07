@@ -1,0 +1,1 @@
+AUC (LogisticRegression) para chronic_absence: 0.7672
