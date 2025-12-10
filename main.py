@@ -1,9 +1,4 @@
 #!/usr/bin/env python3
-"""
-analyze_chronic_absence_no_args.py  (versão corrigida)
-
-Corrige erro "Pandas data cast to numpy dtype of object" ao ajustar Logit.
-"""
 import os
 from datetime import timedelta
 import numpy as np
@@ -18,19 +13,16 @@ import warnings
 warnings.filterwarnings("ignore")
 np.random.seed(0)
 
-# ------------------------- CONFIGURE AQUI -------------------------
 PARAMS = {
     "csv_path": "data/student_monnitoring_data.csv",
     "output_dir": "outputs",
     "random_state": 42,
     "test_size": 0.2,
 }
-# -----------------------------------------------------------------
 
 OUTPUT_DIR = PARAMS["output_dir"]
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-# ------------------------- Helpers -------------------------
 
 def load_csv(path):
     if not os.path.exists(path):
@@ -44,19 +36,15 @@ def preprocess(df):
     df['Date'] = pd.to_datetime(df['Date'])
     df = df.sort_values(['Student ID','Date']).reset_index(drop=True)
 
-    # attendance -> absent
     df['Attendance Status'] = df['Attendance Status'].astype(str)
     df['absent'] = (df['Attendance Status'].str.lower() == 'absent').astype(int)
 
-    # rolling 7-window per student (contagem de faltas)
     df['absent_7sum'] = df.groupby('Student ID')['absent'].rolling(window=7, min_periods=1).sum().reset_index(level=0, drop=True)
     df['chronic_absence'] = (df['absent_7sum'] >= 3).astype(int)
 
-    # lags
     df['absent_lag1'] = df.groupby('Student ID')['absent'].shift(1).fillna(0).astype(int)
     df['absent_lag2'] = df.groupby('Student ID')['absent'].shift(2).fillna(0).astype(int)
 
-    # biometrics
     if 'Sleep Hours' in df.columns:
         df['sleep_hours'] = pd.to_numeric(df['Sleep Hours'], errors='coerce')
         df['mean_sleep'] = df.groupby('Student ID')['sleep_hours'].transform('mean')
@@ -74,7 +62,6 @@ def preprocess(df):
     df['mood'] = pd.to_numeric(df['Mood Score'], errors='coerce') if 'Mood Score' in df.columns else np.nan
     df['anxiety'] = pd.to_numeric(df['Anxiety Level'], errors='coerce') if 'Anxiety Level' in df.columns else np.nan
 
-    # weekday and dummies (force numeric)
     df['weekday'] = df['Date'].dt.weekday
     wdummies = pd.get_dummies(df['weekday'].astype(int), prefix='wd', drop_first=True).astype(int)
     df = pd.concat([df, wdummies], axis=1)
@@ -95,7 +82,6 @@ def safe_logit_with_cluster(df, y_col, X_cols, cluster_col='Student ID'):
     Coerção de tipos e remoção de constantes implementadas.
     """
     result = {}
-    # copy relevant cols
     cols = [y_col] + X_cols + [cluster_col]
     missing = [c for c in cols if c not in df.columns]
     if missing:
@@ -104,12 +90,10 @@ def safe_logit_with_cluster(df, y_col, X_cols, cluster_col='Student ID'):
 
     df2 = df[cols].copy()
 
-    # converter y e X para numéricos quando possível
     df2[y_col] = pd.to_numeric(df2[y_col], errors='coerce')
     for c in X_cols:
         df2[c] = pd.to_numeric(df2[c], errors='coerce')
 
-    # drop rows com NaN em y ou X (cluster pode permanecer)
     df2 = df2.dropna(subset=[y_col] + X_cols).copy()
     if df2.shape[0] == 0:
         result['error'] = "Sem observações após conversão para numérico e dropna."
@@ -118,7 +102,6 @@ def safe_logit_with_cluster(df, y_col, X_cols, cluster_col='Student ID'):
     y = df2[y_col].astype(int)
 
     X_df = df2[X_cols].copy()
-    # remover constantes (zero variância)
     X_df_clean, const_cols = _drop_constant_columns(X_df)
     if const_cols:
         result['warning_drop_constant'] = const_cols
@@ -127,10 +110,8 @@ def safe_logit_with_cluster(df, y_col, X_cols, cluster_col='Student ID'):
         result['error'] = "Nenhum preditor válido após remoção de constantes."
         return result
 
-    # adicionar constante (intercept)
     X = sm.add_constant(X_df_clean, has_constant='add')
 
-    # garantir tipos numpy float
     X = X.astype(float)
 
     try:
@@ -156,8 +137,6 @@ def safe_logit_with_cluster(df, y_col, X_cols, cluster_col='Student ID'):
     except Exception as e:
         result['error'] = str(e)
         return result
-
-# ------------------------- Pipeline principal -------------------------
 
 def run_pipeline(params):
     csv_path = params['csv_path']; out = params['output_dir']
@@ -192,10 +171,9 @@ def run_pipeline(params):
             f.write(df_table.to_string(index=False))
         print("Modelo ajustado com sucesso. Tabela salva em outputs/chronic_logit_table.csv")
 
-    # Treinar sklearn logreg para AUC (mesma lógica anterior)
+    # Treinamento sklearn logreg para AUC 
     print("Treinando classificador LogReg (sklearn) para avaliar AUC...")
     df_model = df[[TARGET] + feat_for_model].copy()
-    # converter numeric e dropar NA
     for c in feat_for_model:
         df_model[c] = pd.to_numeric(df_model[c], errors='coerce')
     df_model = df_model.dropna()
@@ -214,7 +192,6 @@ def run_pipeline(params):
             f.write(f"AUC (LogisticRegression) para chronic_absence: {auc:.4f}\n")
         print(f"AUC (LogisticRegression) = {auc:.4f}")
 
-    # Summário em PT-BR (similar ao anterior)
     summary_text_lines = []
     summary_text_lines.append("Resumo em Português (PT-BR) — análise automática\n")
     summary_text_lines.append("Hipóteses testadas:\n- Histórico de faltas (absent_lag1, absent_lag2) -> chronic_absence\n- Dia da semana (weekday) -> chronic_absence\n")
@@ -234,7 +211,7 @@ def run_pipeline(params):
     else:
         summary_text_lines.append("O modelo Logit não foi ajustado corretamente; ver model_chronic_logit_summary.txt")
 
-    # Gráficos (Português)
+    # Gráficos
     plt.figure(figsize=(7,4))
     rates = df.groupby('weekday')['chronic_absence'].mean()
     weekday_names = {0:'Segunda',1:'Terça',2:'Quarta',3:'Quinta',4:'Sexta',5:'Sábado',6:'Domingo'}
